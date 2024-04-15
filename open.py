@@ -100,13 +100,13 @@ def execute_global_registration(source_down, target_down, source_fpfh,
         ], o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.999))
     return result
 
+if __name__ == '__main__':
+    voxel_size = 0.01
+    distance = 5
+    original = [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
 
-voxel_size = 0.01
-distance = 5
-original = [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
+    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(voxel_size = voxel_size)
+    result_ransac = execute_global_registration(source_down, target_down, source_fpfh, target_fpfh,voxel_size=voxel_size,distance=distance)
+    print(f"\n Result Ransac: \n \n Transformation: \n {result_ransac.transformation} \n \n Fitness: {result_ransac.fitness} \n \n RMSE: {result_ransac.inlier_rmse}")
 
-source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(voxel_size = voxel_size)
-result_ransac = execute_global_registration(source_down, target_down, source_fpfh, target_fpfh,voxel_size=voxel_size,distance=distance)
-print(f"\n Result Ransac: \n \n Transformation: \n {result_ransac.transformation} \n \n Fitness: {result_ransac.fitness} \n \n RMSE: {result_ransac.inlier_rmse}")
-
-draw_registration_result(source, target, result_ransac.transformation, f"output_folder/registration_vs{voxel_size}_{datetime}.png")
+    draw_registration_result(source, target, result_ransac.transformation, f"output_folder/registration_vs{voxel_size}_{datetime}.png")
