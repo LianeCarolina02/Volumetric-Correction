@@ -127,3 +127,7 @@ dmypy.json
 *.ply
 *.bin
 
+
+Manequin/
+
+output_folder/
