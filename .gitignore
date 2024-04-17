@@ -126,8 +126,11 @@ dmypy.json
 *.stl
 *.ply
 *.bin
+*.xml
 
 
 Manequin/
 
 output_folder/
+
+Noise_ply/
