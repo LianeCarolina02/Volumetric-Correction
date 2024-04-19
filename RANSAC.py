@@ -20,8 +20,8 @@ Torso = "Manequin/Mannequin_Torso_ASCII.ply"
 def global_registration_ransac(source_down, target_down, source_fpfh,
                                 target_fpfh, voxel_size, distance):
     distance_threshold = voxel_size * distance
-    print(":: RANSAC registration")
-    print(":: distance threshold %.3f." % distance_threshold)
+    # print(":: RANSAC registration")
+    # print(":: distance threshold %.3f." % distance_threshold)
 
     result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
         source_down, target_down, source_fpfh, target_fpfh, True,

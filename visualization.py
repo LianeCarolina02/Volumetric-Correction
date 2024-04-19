@@ -14,8 +14,7 @@ def draw_point_cloud(pcd):
     pcd.colors = o3d.utility.Vector3dVector(colors)
 
     o3d.visualization.draw_geometries([pcd], width=1600, 
-                                  height=1200, point_show_normal=False, 
-                                  mesh_show_wireframe=False, mesh_show_back_face=False)
+                                  height=1200)
 
 
 def draw_registration_result(source, target, transformation):
@@ -30,8 +29,6 @@ def draw_registration_result(source, target, transformation):
     vis.create_window(width=1600, height=1200)
     vis.add_geometry(source_temp)
     vis.add_geometry(target_temp)
-    vis.get_render_option().point_show_normal = False
-    vis.get_render_option().mesh_show_wireframe = False
     vis.get_render_option().mesh_show_back_face = False
     vis.run()
 
@@ -47,9 +44,6 @@ def save_image(source, target, transformation, filename):
     vis.create_window(width=1600, height=1200)
     vis.add_geometry(source_temp)
     vis.add_geometry(target_temp)
-    vis.get_render_option().point_show_normal = False
-    vis.get_render_option().mesh_show_wireframe = False
-    vis.get_render_option().mesh_show_back_face = False
     vis.run()
     
     vis.capture_screen_image(filename)
