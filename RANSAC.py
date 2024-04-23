@@ -20,8 +20,8 @@ Torso = "Manequin/Mannequin_Torso_ASCII.ply"
 def global_registration_ransac(source_down, target_down, source_fpfh,
                                 target_fpfh, voxel_size, distance):
     distance_threshold = voxel_size * distance
-    print(":: RANSAC registration")
-    print(":: distance threshold %.3f." % distance_threshold)
+    # print(":: RANSAC registration")
+    # print(":: distance threshold %.3f." % distance_threshold)
 
     result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
         source_down, target_down, source_fpfh, target_fpfh, True,
@@ -48,18 +48,14 @@ if __name__ == '__main__':
 
     source, target, source_down, target_down, source_fpfh, target_fpfh = prd.prepare_dataset(Breast, Torso, voxel_size = voxel_size)
 
-    ransac = global_registration_ransac(source_down, target_down, source_fpfh, target_fpfh,voxel_size=voxel_size,distance=distance)
+    # ransac = global_registration_ransac(source_down, target_down, source_fpfh, target_fpfh,voxel_size=voxel_size,distance=distance)
+    
+    
+    source_point_cloud = o3d.io.read_point_cloud(Breast)
+
+    # Create a condition
+    condition = source_fpfh.data[6, :] > 150
 
 
-    # vis.draw_registration_result(source, 
-    #                              target, 
-    #                              ransac.transformation, 
-    #                              f"{folder}/vs{voxel_size}_d{distance}_{prd.get_current_datetime()}.png")
     
 
-    ev = ev.evaluation(source, target, threshold, ransac.transformation)
-
-    end_time = time.time()
-
-    duration = end_time - start_time
-    print(f"Duration of {duration}")    
