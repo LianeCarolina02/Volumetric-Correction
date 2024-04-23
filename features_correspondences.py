@@ -6,7 +6,8 @@ import visualization as vis
 import prepare_dataset as prd
 import icp 
 import RANSAC
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
 
@@ -56,6 +57,12 @@ fpfh_6th_target = np.asarray(pcd_fpfh_target.data[6,:])
 
 def retain_90_percent_variance(X):
     # Inicializa o PCA
+
+    means = X.mean(axis=0)
+    std = X.std(axis=0)
+    std[std==0] = 1
+    X = (X - means)/std
+
     pca = PCA()
     # Ajusta o PCA aos dados
     pca.fit(X)
@@ -77,20 +84,30 @@ def retain_90_percent_variance(X):
     
     return X_pca
 
-X_reduced = retain_90_percent_variance(pcd_fpfh_source.data)
+X_reduced = retain_90_percent_variance(pcd_fpfh_source.data.T).T
+# X_reduced = fpfh_6th_source 
+
 # Clustering interesting features
+X_ordered = np.sort(fpfh_6th_source)
+Y = np.arange(1, len(X_ordered))
 
+gm = GaussianMixture(n_components=3, random_state=0).fit_predict(fpfh_6th_source.reshape(-1,1))
+# kmeans = KMeans(n_clusters=4, random_state=0, n_init="auto").fit_predict(X_reduced[0].reshape(-1,1))
 
+colors = np.array([[0, 0, 1], [1, 1, 0], [1, 0, 0], [0.5, 0.5, 0.5]])[gm]  # Blue for 0, Red for 1
 
+# Create Open3D point cloud
+pcd = o3d.geometry.PointCloud()
+pcd.points = source.points
+pcd.colors = o3d.utility.Vector3dVector(colors)
 
-
-
-
+# Visualize the point cloud
+o3d.visualization.draw_geometries([pcd])
 # Visualization
 colormap = 'inferno'
 
 fpfh_colors = plt.get_cmap(colormap )(
-        (X_reduced - X_reduced.min()) / (X_reduced.max()- X_reduced.min()))
+        (X_reduced[0] - X_reduced[0].min()) / (X_reduced[0].max()- X_reduced[0].min()))
 
 fpfh_colors = fpfh_colors[:, :3]
 
@@ -101,7 +118,7 @@ fpfh_pcd.colors = o3d.utility.Vector3dVector(fpfh_colors)
 
 vis = o3d.visualization.Visualizer()
 vis.create_window(width=1600, height=1200)
-vis.add_geometry(X_reduced)
+vis.add_geometry(fpfh_pcd)
 vis.run()
 
 # vis.capture_screen_image(f"{folder}/Feature_{i}_torso.png")
