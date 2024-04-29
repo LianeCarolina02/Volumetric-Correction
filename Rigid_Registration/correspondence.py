@@ -64,7 +64,6 @@ def plot_correspondences(source, target, source_down, target_down, transformatio
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Define the distances function
 def distances(source_down, target_down, transformation):
     """
     Compute Euclidean distances between corresponding points in two point clouds.
@@ -85,44 +84,3 @@ def distances(source_down, target_down, transformation):
     
     hist, bins = np.histogram(euclidean_distances, bins=40)
     return hist, bins
-
-if __name__ == '__main__':
-
-    BREAST = "Manequin/Mannequin_Breast_ASCII.ply"
-    FASCIA = "Manequin/Mannequin_Fascia_ASCII.ply"
-    TORSO = "Manequin/Mannequin_Torso_ASCII.ply"
-    VOXEL_SIZE = [0.01, 0.01, 0.01, 0.01, 0.015, 0.02]  # Assuming you have this defined
-
-    SIGMAS = [0.0001, 0.0005, 0.001, 0.005, 0.01]
-
-    SOURCES_BREAST = [BREAST] + [f"Noise_ply/Breast_Noise_{sigma}.ply" for sigma in SIGMAS]
-    SOURCES_FASCIA = [FASCIA] + [f"Noise_ply/Fascia_Noise_{sigma}.ply" for sigma in SIGMAS]
-
-    source_types = [SOURCES_BREAST, SOURCES_FASCIA]
-
-    for source_type in source_types:
-        all_histograms = []
-        all_bins = []
-
-        for i, idx in enumerate(source_type):
-            source, target, source_down, target_down, source_fpfh, target_fpfh = prd.prepare_dataset(idx, TORSO, voxel_size=VOXEL_SIZE[i])
-
-            transformation = icp.vanilla_icp(source_down, target_down, 0.02).transformation
-
-            hist, bins = distances(source_down, target_down, transformation)
-            
-            all_histograms.append(hist)
-            all_bins.append(bins)
-
-        all_histograms = all_histograms[::-1]
-        all_bins = all_bins[::-1]
-
-        for bins, histogram in zip(all_bins, all_histograms):
-            plt.hist(bins[:-1], weights=histogram, bins=bins, alpha=0.8) # Plot each histogram with transparency and reversed order
-
-        names = [f"Original", "Noise 0.0001", "Noise 0.0005", "Noise 0.001", "Noise 0.005", "Noise 0.01"]
-        plt.xlabel('Distance')
-        plt.ylabel('Frequency')
-        plt.title(f'Histograms of Euclidean Distances for {source_type}')
-        plt.legend(names[::-1])  # Add legend with labels for each histogram
-        plt.show()

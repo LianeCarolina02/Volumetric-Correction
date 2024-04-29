@@ -7,16 +7,6 @@ import visualization as vis
 import time
 import evaluation as ev
 
-start_time = time.time()
-sigma = 0.001
-
-Breast = "Manequin/Mannequin_Breast_ASCII.ply"
-Breast_noise = f"Noise_ply/Breast_Noise_{sigma}.ply"
-
-Fascia = "Manequin/Mannequin_Fascia_ASCII.ply"
-
-Torso = "Manequin/Mannequin_Torso_ASCII.ply"
-
 def global_registration_ransac(source_down, target_down, source_fpfh,
                                 target_fpfh, voxel_size, distance):
     distance_threshold = voxel_size * distance

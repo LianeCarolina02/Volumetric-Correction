@@ -50,11 +50,3 @@ def save_image(source, target, transformation, filename):
     vis.capture_screen_image(filename)
     
     vis.destroy_window()
-# Breast = "Manequin/Mannequin_Breast_ASCII.ply"
-
-# Fascia = "Manequin/Mannequin_Fascia_ASCII.ply"
-
-# Torso = "Manequin/Mannequin_Torso_ASCII.ply"
-# voxel_size = 0.01
-# source, target, source_down, target_down, source_fpfh, target_fpfh = prd.prepare_dataset(Breast, Torso, voxel_size = voxel_size)
-# draw_point_cloud(source)

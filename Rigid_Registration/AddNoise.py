@@ -30,29 +30,3 @@ def noise(pcd, mu):
         points[distances < radius] += noise  
     noisy_pcd.points = o3d.utility.Vector3dVector(points)  
     return noisy_pcd
-
-mu, sigma = 0, 0.001  # mean and standard deviation
-voxel_size = 0.01
-
-Breast = "Manequin/Mannequin_Breast_ASCII.ply"
-Torso = "Manequin/Mannequin_Torso_ASCII.ply"
-Fascia = "Manequin/Mannequin_Fascia_ASCII.ply"
-
-target = o3d.io.read_point_cloud(Torso)
-source = o3d.io.read_point_cloud(Breast)
-
-# source_noisy = apply_noise(source, mu, sigma)
-
-folder = "Noise_ply"
-filename_0 = f"Breast_local_1_Noise"
-filename_1 = f"Breast_Noise_{sigma}"
-
-# save_ply(source_noisy, folder, filename)
-
-Result_name_0 = f"{folder}/{filename_0}.ply" 
-Result_name_1 = f"{folder}/{filename_1}.ply" 
-
-Result_0 = o3d.io.read_point_cloud(Result_name_0)
-Result_1 = o3d.io.read_point_cloud(Result_name_1)
-
-vis.draw_registration_result(Result_0, Result_1, transformation=np.identity(4))
