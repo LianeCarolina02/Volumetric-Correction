@@ -50,3 +50,7 @@ def save_image(source, target, transformation, filename):
     vis.capture_screen_image(filename)
     
     vis.destroy_window()
+
+
+
+
