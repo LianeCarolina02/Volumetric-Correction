@@ -30,10 +30,18 @@ def preprocessing(pcd, voxel_size = 0.01):
         pcd_down, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
     return pcd_down, pcd_fpfh
 
-def prepare_dataset(source_pcd, target_pcd, voxel_size=0.01):
+def prepare_dataset_path(source_pcd, target_pcd, voxel_size=0.01):
     target = o3d.io.read_point_cloud(target_pcd)
     source = o3d.io.read_point_cloud(source_pcd)
 
+    # print(":: Prepare Source Dataset")
+    source_down, source_fpfh = preprocessing(source, voxel_size)
+    # print(":: Prepare Target Dataset")
+    target_down, target_fpfh = preprocessing(target, voxel_size)
+
+    return source, target, source_down, target_down, source_fpfh, target_fpfh
+
+def prepare_dataset(source, target, voxel_size=0.01):
     # print(":: Prepare Source Dataset")
     source_down, source_fpfh = preprocessing(source, voxel_size)
     # print(":: Prepare Target Dataset")

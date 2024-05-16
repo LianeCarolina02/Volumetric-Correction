@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import prepare_dataset as prd
 import visualization as vis
 import time
-import evaluation as ev
+
 
 def global_registration_ransac(source_down, target_down, source_fpfh,
                                 target_fpfh, voxel_size, distance):

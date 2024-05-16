@@ -25,15 +25,13 @@ def visualize_point_cloud_digital_twin(mesh_path, number):
     vis.run()
     vis.destroy_window()
 
-def visualize_surface_digital_twin(pcd_path, voxel_size):
-    pcd= o3d.io.read_point_cloud(pcd_path)
-    downpcd = pcd.voxel_down_sample(voxel_size=voxel_size)
-    downpcd.paint_uniform_color([0.5,0.5,0.5])
+def visualize_save_surface_digital_twin(patient, pcd):
     vis = o3d.visualization.Visualizer()
     vis.create_window(width=1600, height=1200)
     vis.add_geometry(pcd)
     vis.run()
     vis.destroy_window()
+    o3d.io.write_point_cloud(f"Pacients/{patient}/Final_Surface.ply", pcd)
 
 def visualize_surface_scan_mesh(mesh_path):
     mesh = o3d.io.read_triangle_mesh(mesh_path)
@@ -77,9 +75,6 @@ if __name__ == '__main__':
     digital_twin = f"{folder}/{patient}/Segment_4.stl"
     surface_digital_twin = f"{folder}/{patient}/Surface.ply"
 
-    # visualize_surface_and_all(surface_digital_twin,digital_twin)
-    visualize_mesh_digital_twin(digital_twin)
-    visualize_surface_digital_twin
 
 
 

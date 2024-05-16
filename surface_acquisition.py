@@ -107,6 +107,22 @@ def visualize_hpr(all_pcd, cameras, colors):
     visualizer.run()
     visualizer.destroy_window()
 
+def visualize_surface_and_all(surface, original_pcd):
+    surface_copy = copy.deepcopy(surface)
+    original_pcd.paint_uniform_color([0.5, 1, 0.5])
+    surface.paint_uniform_color([1,0.5,0.5])
+
+    x_max,_,_,_,_,_ = bouding_points(surface_copy)
+
+    surface_copy.translate([0,0, -200])
+
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=1600, height=1200)
+    vis.add_geometry(original_pcd)
+    vis.add_geometry(surface_copy)
+    vis.run()
+    vis.destroy_window()
+
 
 def box(pcd):
     print("::       Computation of the box")
