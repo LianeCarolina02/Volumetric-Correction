@@ -25,4 +25,6 @@ def robust_icp(source, target, threshold):
                                                         threshold, trans_init,
                                                         p2l)
     
+
+    
     return reg_p2l

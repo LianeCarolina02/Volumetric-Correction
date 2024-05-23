@@ -7,7 +7,7 @@ import open3d as o3d
 
 import icp
 import prepare_dataset as prd
-import deformation_graph
+import studies
 
 BREAST = "Manequin/Mannequin_Breast_ASCII.ply"
 FASCIA = "Manequin/Mannequin_Fascia_ASCII.ply"
