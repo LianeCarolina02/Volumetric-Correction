@@ -85,10 +85,13 @@ def first_transformation(digital_twin, surface_scan, downsample=10):
 
     return source_down_copy, target_down, transformation, correspondence
 
-def read_point_clouds(id):
+def read_point_clouds(id, scan_2=False):
     patient = "BR0" + f"{id}"
     surface_digital_twin = f"Pacients/{patient}/Final_Surface.ply"
-    surface_scan = f"Pacients/{patient}/{id}/{id}.obj"
+    if id == 74 and scan_2:
+        surface_scan = "Pacients/BR074/74/Scan 2.obj"
+    else:
+        surface_scan = f"Pacients/{patient}/{id}/{id}.obj"
 
     mesh_surface_scan = o3d.io.read_triangle_mesh(surface_scan)
 
