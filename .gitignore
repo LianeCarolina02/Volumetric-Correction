@@ -127,6 +127,8 @@ dmypy.json
 *.ply
 *.bin
 *.xml
+*.avi
+*.json
 
 
 Manequin/
