@@ -3,6 +3,7 @@ import open3d as o3d
 import copy
 import numpy as np
 import surface_acquisition
+import cv2
 
 def visualize_mesh_digital_twin(mesh_path):
     mesh = o3d.io.read_triangle_mesh(mesh_path)
@@ -36,11 +37,23 @@ def visualize_save_surface_digital_twin(patient, pcd):
 def visualize_surface_scan_mesh(mesh_path):
     mesh = o3d.io.read_triangle_mesh(mesh_path)
     mesh.compute_vertex_normals()
+    mesh.paint_uniform_color([0, 0.651, 0.929])
     vis = o3d.visualization.Visualizer()
     vis.create_window(width=1600, height=1200)
     vis.add_geometry(mesh)
     vis.run()
     vis.destroy_window()
+
+def visualize_pcd_twin(pcd_path):
+    pcd = o3d.io.read_point_cloud(pcd_path)
+    pcd.paint_uniform_color([1, 0.706, 0])
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=15, max_nn=30))
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=1600, height=1200)
+    vis.add_geometry(pcd)
+    vis.run()
+    vis.destroy_window()
+
 
 def visualize_surface_and_all(pcd_path, mesh_path):
     print("Reading Mesh...")
@@ -81,17 +94,58 @@ def draw_registration_result(source, target, transformation):
     vis.run()
 
 
+def capture_video(mesh_path=None, pcd_path=None, pcd=None, output_file="this.avi", width=640, height=480, fps=30):
+    if mesh_path is not None:
+        pcd = o3d.io.read_triangle_mesh(mesh_path)
+        pcd.compute_vertex_normals()
+    elif pcd_path is not None:
+        pcd = o3d.io.read_point_cloud(pcd_path)
+        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=15, max_nn=30))
+    
+
+    # Initialize Open3D visualization
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=width, height=height)
+
+    # Initialize video writer
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
+
+    vis.add_geometry(pcd)
+    view_control = vis.get_view_control()
+
+    # Capture frames
+    for _ in range(360):  # Rotate 360 degrees
+        vis.update_geometry(pcd)
+        vis.poll_events()
+        vis.update_renderer()
+        view_control.rotate(0.0, 10.0)
+
+        # Capture the current frame
+        image = vis.capture_screen_float_buffer(False)
+        image = np.asarray(image)
+        image = (image * 255).astype(np.uint8)  # Convert to 8-bit unsigned integer
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        out.write(image)
+
+    # Release resources
+    vis.destroy_window()
+    out.release()
+    cv2.destroyAllWindows()
+
 if __name__ == '__main__':
     folder = "Pacients"
-    number = 61
+    number = 74
 
     patient = "BR0" + f"{number}"
 
     digital_twin = f"{folder}/{patient}/Segment_4.stl"
-    surface_digital_twin = f"{folder}/{patient}/Surface.ply"
+    surface_digital_twin = "Pacients/BR074/Final_Surface.ply"
+    _try_ = "Pacients/BR074/try.stl"
+    surface_scan = f"Pacients/{patient}/{number}/{number}.obj"
 
+    # visualize_mesh_digital_twin(_try_)
+    # visualize_surface_scan_mesh(surface_scan)
+    visualize_pcd_twin(surface_digital_twin)
 
-
-
-
-
+    # capture_video(mesh_path=digital_twin, pcd_path=None, output_file="original_mesh.avi", width=1920, height=1080, fps=30)

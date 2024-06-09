@@ -6,8 +6,10 @@ import filter
 import RANSAC
 import matplotlib.cm as cm
 import prepare_dataset as prd
+import visualization as vis
 import matplotlib.pyplot as plt
-
+import surface_acquisition as sa
+import matplotlib.colors as mcolors
 
 def graph_and_nodes(pcd, voxel_size_1, voxel_size_2):
 
@@ -88,14 +90,25 @@ def first_transformation(digital_twin, surface_scan, downsample=10):
 def read_point_clouds(id, scan_2=False):
     patient = "BR0" + f"{id}"
     surface_digital_twin = f"Pacients/{patient}/Final_Surface.ply"
+    tumor_path = f"Pacients/BR0{id}/Segment_1.stl"
+    simplified_mesh_path = f"Pacients/BR0{id}/try.stl"
+
     if id == 74 and scan_2:
         surface_scan = "Pacients/BR074/74/Scan 2.obj"
     else:
         surface_scan = f"Pacients/{patient}/{id}/{id}.obj"
 
     mesh_surface_scan = o3d.io.read_triangle_mesh(surface_scan)
+    mesh_tumor = o3d.io.read_triangle_mesh(tumor_path)
+    simplified_mesh = o3d.io.read_triangle_mesh(simplified_mesh_path)
 
     pcd_scan = mesh_surface_scan.sample_points_uniformly(number_of_points=500000)
+    pcd_tumor = mesh_tumor.sample_points_uniformly(number_of_points=10000)
+    pcd_simplified_mesh = simplified_mesh.sample_points_uniformly(number_of_points=200000)
+    _, rotation, vector = sa.rotation_pcd(pcd_simplified_mesh)
+    pcd_tumor.rotate(rotation)
+    pcd_tumor.translate(vector)
+
     pcd_digital_twin = o3d.io.read_point_cloud(surface_digital_twin)
 
     if id in {63, 64, 66, 67, 69, 71, 73, 74, 76}:
@@ -119,14 +132,14 @@ def read_point_clouds(id, scan_2=False):
                          [0,0,1],
                          [0,-1,0]])
 
-    return pcd_scan, pcd_digital_twin
+    return pcd_scan, pcd_digital_twin, pcd_tumor
 
 def plot_histogram_distances(patients_ids):
     distances_dict = {}
     distances_dict_down = {}
 
     for id in patients_ids:
-        target, source = read_point_clouds(id=id)
+        target, source,_ = read_point_clouds(id=id)
         source_down, target_down, first_trans, correspondence_down = first_transformation(source, target)
         source.transform(first_trans)
         source_down.transform(first_trans)
@@ -174,9 +187,38 @@ def plot_histogram_distances(patients_ids):
 
     # Plot combined histogram
     plt.figure(figsize=(10, 6))
+    hist_sums = {}
     for idx, patient_id in enumerate(distances_dict):
-        plt.hist(distances_dict[patient_id], bins=200, alpha=0.7, label=f'{patient_id} full', density=True)
-        plt.hist(distances_dict_down[patient_id], bins=100, alpha=0.7, label=f'{patient_id} downsampled', density=True)
+        # hist_full, bins_full = np.histogram(distances_dict[patient_id], bins=200)
+        hist_down, bins_down = np.histogram(distances_dict_down[patient_id], bins=50)
+
+        # max_hist_full = np.max(distances_dict[patient_id])
+        # min_hist_full = np.min(distances_dict[patient_id])
+        # max_hist_down = np.max(distances_dict_down[patient_id])
+        # min_hist_down = np.min(distances_dict_down[patient_id])
+
+        # bin_size_full = (max_hist_full - min_hist_full)/200
+        # bin_size_down = (max_hist_down - min_hist_down)/200
+
+        # print(f"bin size: {bin_size_full}")
+        # print(f"bin size: {bin_size_down}")
+        
+        # sum_full = np.sum(hist_full)
+        # sum_down = np.sum(hist_down)
+
+        # Store the integer sums in the dictionary
+        # hist_sums[patient_id] = {
+        #     'sum_full': int(sum_full),
+        #     'sum_down': int(sum_down)
+        # }
+
+        # print(f'Patient {patient_id} - Full Histogram Sum: {sum_full}')
+        # print(f'Patient {patient_id} - Downsampled Histogram Sum: {sum_down}')
+
+        # plt.hist(bins_full[:-1], bins_full, weights=hist_full/sum_full, alpha=0.7, label=f'{patient_id} - evaluation from open3d')
+        plt.hist(bins_down[:-1], bins_down, weights=hist_down, alpha=0.7, label=f'{patient_id} - icp')
+
+
 
     plt.title('Histogram of Distances from Corresponding Points in Breast')
     plt.xlabel('Distance (mm)')
@@ -191,7 +233,7 @@ def plot_correspondences(ids):
     Plot correspondences between source and target point clouds.
     """
     for id in ids:
-        target, source = read_point_clouds(id=id)
+        target, source,_ = read_point_clouds(id=id)
         source_down, target_down, transformation, correspondence = first_transformation(source, target, downsample=10)
 
         num_rows_to_keep = correspondence.shape[0] // 40
@@ -267,10 +309,11 @@ def plot_correspondences(ids):
         
         vis.run()
         vis.destroy_window()
+        return source_temp + target_temp + line_set + spheres_source + spheres_target
 
 def plot_distances(ids, evaluation_correspondence=True):
     for id in ids:
-        target, source = read_point_clouds(id=id)
+        target, source,_ = read_point_clouds(id=id)
 
         source_temp = copy.deepcopy(source)
         target_temp = copy.deepcopy(target)
@@ -316,7 +359,7 @@ def plot_distances(ids, evaluation_correspondence=True):
         point_cloud.points = o3d.utility.Vector3dVector(target_temp_points)
         distances = np.array(distances)
         distances_pos_log = (distances[distances >= 0])
-        distances_neg_log = (-distances[distances < 0])
+        distances_neg_log = (distances[distances < 0])
         max_dist = max(np.max(distances_pos_log), np.max(distances_neg_log))
         min_dist = min(np.min(distances_pos_log), np.min(distances_neg_log))
 
@@ -324,11 +367,11 @@ def plot_distances(ids, evaluation_correspondence=True):
         blue = np.array([[0, 0, 1]])
         white = np.array([[1, 1, 1]])
 
-        colors_pos = ((distances_pos_log - min_dist) / (max_dist - min_dist)).reshape(-1, 1) @ red + \
-                    ((max_dist - distances_pos_log) / (max_dist - min_dist)).reshape(-1, 1) @ white
+        colors_pos = ((distances_pos_log - 0) / (max_dist - 0)).reshape(-1, 1) @ red + \
+                    ((max_dist - distances_pos_log) / (max_dist - 0)).reshape(-1, 1) @ white
         
-        colors_neg = ((distances_neg_log - min_dist) / (max_dist - min_dist)).reshape(-1, 1) @ blue + \
-                    ((max_dist - distances_neg_log) / (max_dist - min_dist)).reshape(-1, 1) @ white
+        colors_neg = ((distances_neg_log - min_dist) / (0 - min_dist)).reshape(-1, 1) @ white + \
+                    ((0 - distances_neg_log) / (0 - min_dist)).reshape(-1, 1) @ blue
         
         print(distances)
         colors = np.zeros((distances.shape[0], 3))
@@ -338,6 +381,7 @@ def plot_distances(ids, evaluation_correspondence=True):
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(target_temp_points)
         point_cloud.colors = o3d.utility.Vector3dVector(colors)
+
 
         # Visualize the point cloud
         vis = o3d.visualization.Visualizer()
@@ -353,18 +397,38 @@ def plot_distances(ids, evaluation_correspondence=True):
         vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame(size=70.0))
         vis.run()
         vis.destroy_window()
+        colors = [(0, 0, 1), (1, 1, 1), (1, 0, 0)]  # Blue, White, Red
+        cmap_name = 'custom_color_map'
+        custom_cmap = mcolors.LinearSegmentedColormap.from_list(cmap_name, colors)
+
+        # Create some data
+        print(min_dist)
+        print(max_dist)
+        data = np.random.randint(min_dist, max_dist, size=(10,10))
+
+        # Plot the data with a colorbar
+        plt.imshow(data, cmap=custom_cmap, vmin=min_dist, vmax=max_dist)
+        cbar = plt.colorbar()
+
+        # Define the ticks and labels for the colorbar
+        cbar.set_ticks([min_dist, 0, max_dist])
+        cbar.set_ticklabels([str(min_dist), str(0), str(max_dist)])
+
+        plt.show()
+        
 
 
 if __name__ == "__main__":
     all_ids = [61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 73, 74, 76]
 
     all_idsx = [[61], [62], [63], [64], [65], [66], [67], [68], [69], [71], [73], [74], [76]]
-    ids = [65, 66, 68]#, 74]
+    ids = [74]#, 68]#, 74]
     # graph_twin, nodes_twin = graph_and_nodes(source, 1, 10)
     # graph_scan, nodes_scan = graph_and_nodes(target, 1, 10)
 
     # visualize_graph(nodes_twin, graph_twin)
     # visualize_graph(nodes_scan, graph_scan)
 
-    plot_distances(ids, True)
-    plot_correspondences(all_ids)
+    # plot_distances(ids, True)
+    # pcd = plot_correspondences(ids)
+    plot_histogram_distances(ids)

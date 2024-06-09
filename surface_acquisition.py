@@ -25,13 +25,14 @@ def rotation_pcd(pcd):
     x_min = rotated_pcd.get_min_bound()[0]
     half_x_1 = (x_max + x_min)/2
     print(f"::      z_min and half_x: {z_min_1, half_x_1}")
-    rotated_pcd.translate([-half_x_1, 0, -z_min_1])
+    vector = [-half_x_1, 0, -z_min_1]
+    rotated_pcd.translate(vector)
     z_min_2 = rotated_pcd.get_min_bound()[2]
     x_max = rotated_pcd.get_max_bound()[0]
     x_min = rotated_pcd.get_min_bound()[0]
     half_x_2 = (x_max + x_min)/2
     print(f"::      z_min and half_x: {z_min_2, half_x_2}")
-    return rotated_pcd
+    return rotated_pcd, rotation_matrix, vector
 
 def computation_diameter(pcd):
     print("::       Computing Diameter")
@@ -73,7 +74,7 @@ def final_pcd(all_pcd, cameras, colors, patient):
         merged_pcd +=  hidden_points_removal(all_pcd, camera_coords, color, diameter)
 
     print("::       Finish Merged")
-    merged_pcd.paint_uniform_color(colors[0])
+    # merged_pcd.paint_uniform_color(colors[0])
     visualizer = o3d.visualization.Visualizer()
     visualizer.create_window()
     visualizer.add_geometry(merged_pcd)

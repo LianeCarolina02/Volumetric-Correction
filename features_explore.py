@@ -6,6 +6,7 @@ import matplotlib.image as mpimg
 import os
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+from sklearn.cluster import OPTICS
 
 def save_features(pcd_path, pcd_type: str, folder: str, capture_screen=True):
     
@@ -80,21 +81,22 @@ def bounded_values_fpfh(fpfh_matrix):
     minimum = fpfh_matrix.min()
     return maximum, minimum
 
-def normalize_fpfh(fpfh_matrixes):
-    normalized_matrixes = []
-    for fpfh_matrix in fpfh_matrixes:
-        normalized_matrix = np.zeros_like(fpfh_matrix)
-
-        for index, row in enumerate(fpfh_matrix):
-            row_min = np.min(row)
-            row_max = np.max(row)
-            if row_max != row_min:  # To avoid division by zero
-                normalized_matrix[index] = (row - row_min) / (row_max - row_min)
-            else:
-                normalized_matrix[index] = row 
-        normalized_matrixes.append(normalized_matrix)
-
-    return normalized_matrixes
+def normalize_fpfh(pcd_matrices):
+    
+    
+    all_normalized = []
+    
+    for matrix in pcd_matrices:
+        # Compute row-wise max values for each matrix in the stack
+        row_max = np.max(matrix, axis=1, keepdims=True)
+        
+        # Perform element-wise division, handling division by zero
+        normalized = matrix / row_max
+        
+        # Append the normalized matrices back into the list
+        all_normalized.append(normalized)
+    
+    return all_normalized
 
 
 def global_normalization(pcd_matrixes):
@@ -289,7 +291,7 @@ def features_against_features_3d(matrices, names, nipples, num_features):
         vis.run()
         vis.destroy_window()
     
-def clustering(pcds_fpfh, num_features:list):
+def clustering_kmeans(pcds_fpfh, num_features:list):
     num_clusters = 3
 
     # Fit K-means on the first matrix
@@ -318,6 +320,35 @@ def clustering(pcds_fpfh, num_features:list):
 
     plt.tight_layout()
     plt.show()
+
+# def clustering_optics(pcds_fpfh, num_features:list):
+#     num_clusters = 3
+
+#     # Fit K-means on the first matrix
+#     optics = OPTICS(min_samples=2).fit(pcds_fpfh[1].T)
+
+#     # Create subplots
+#     num_matrices = len(pcds_fpfh)
+
+# def visualize()
+#     fig, axs = plt.subplots(1, num_matrices, figsize=(16, 6))
+
+#     for idx, (ax, pcd_fpfh) in enumerate(zip(axs, pcds_fpfh)):
+#         # Predict the labels for each matrix using the fitted model
+#         labels = optics.predict(pcd_fpfh.T)
+
+#         # Visualize the clusters on the respective subplot
+#         for i in range(num_clusters):
+#             ax.scatter(pcd_fpfh.T[labels == i, num_features[0] ], pcd_fpfh.T[labels == i, num_features[1]], label=f'Cluster {i}')
+#         # ax.scatter(centroids[:, num_features[0]], centroids[:, num_features[1]], s=300, c='red', label='Centroids')
+#         ax.set_title(f'Matrix {idx + 1}')
+#         ax.set_xlabel('Feature 1')
+#         ax.set_ylabel('Feature 2')
+#         ax.legend()
+
+#     plt.tight_layout()
+#     plt.show()
+
 
 if __name__ == "__main__":
     Breast = "Rigid_Registration/Manequin/Mannequin_Breast_ASCII.ply"
