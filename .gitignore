@@ -128,15 +128,15 @@ dmypy.json
 *.bin
 *.xml
 *.avi
-*.json
-
+*.DS_Store
 
 Manequin/
-
 output_folder/
-
 Noise_ply/
-
 Features/
 Pacients/
 SS60/
+Models/
+Pickles/
+
+
