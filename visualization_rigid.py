@@ -4,18 +4,7 @@ import matplotlib.pyplot as plt
 import copy
 import prepare_dataset as prd
 
-def draw_point_cloud(pcd):
-    points = np.asarray(pcd.points)
-    color_map = plt.get_cmap('Blues')
 
-    z_min = np.min(points[:, 2])
-    z_max = np.max(points[:, 2])
-    colors = color_map(((1 - (points[:, 2] - z_min) / (z_max - z_min)) + 0.5))[:, :3]
-
-    pcd.colors = o3d.utility.Vector3dVector(colors)
-
-    o3d.visualization.draw_geometries([pcd], width=1600, 
-                                  height=1200)
 
 
 def draw_registration_result(source, target, transformation):
@@ -32,6 +21,7 @@ def draw_registration_result(source, target, transformation):
     vis.add_geometry(source_temp)
     vis.add_geometry(target_temp)
     vis.get_render_option().mesh_show_back_face = False
+    
     vis.run()
 
 

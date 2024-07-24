@@ -8,10 +8,10 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.cluster import OPTICS
 
-def save_features(pcd_path, pcd_type: str, folder: str, capture_screen=True):
+def save_features(pcd_path, pcd_type: str, folder: str, voxel_size: int, capture_screen=True):
     
     pcd = o3d.io.read_point_cloud(pcd_path)
-    pcd_fpfh = fpfh_matrix(pcd, voxel_size=voxel_downsample)
+    pcd_fpfh = fpfh_matrix(pcd, voxel_size).data
     maximum, minimum = bounded_values_fpfh(pcd_fpfh)
     
     for i in range(len(pcd_fpfh)):
@@ -66,20 +66,60 @@ def see_features(folder: str, pcd_type: str, num_rows: int, num_cols: int, featu
     plt.show()
 
 
-def fpfh_matrix(pcds, voxel_size):
-    pcds_fpfh = []
-    for pcd in pcds:
-        radius_normal = voxel_size * 2
-        pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=30))
-        radius_feature = voxel_size * 5
-        pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
-        pcds_fpfh.append(pcd_fpfh.data)
-    return pcds_fpfh
+def fpfh_matrix(pcd, voxel_size):
+    radius_normal = voxel_size * 2
+    pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=30))
+    radius_feature = voxel_size * 5
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
+    data = pcd_fpfh.data.T
+    return data
 
 def bounded_values_fpfh(fpfh_matrix):
     maximum = fpfh_matrix.max()
     minimum = fpfh_matrix.min()
     return maximum, minimum
+
+def features_selection(pcd, voxel_size, indices):
+    matrix = fpfh_matrix(pcd, voxel_size)
+    indices = np.array(indices)
+    selected_data = matrix[: ,indices]
+    return selected_data
+
+
+# Important features
+
+def retain_90_percent_variance(pcd, voxel_size):
+    # Inicializa o PCA
+
+    X = fpfh_matrix(pcd, voxel_size)
+
+    # means = X.mean(axis=0)
+    # std = X.std(axis=0)
+    # std[std==0] = 1
+    # X = (X - means)/std
+
+    pca = PCA()
+    pca.fit(X)
+    
+    # Determina o número de componentes principais que retêm 90% da variância
+    total_variance = np.sum(pca.explained_variance_)
+    target_variance = 0.9 * total_variance
+    retained_variance = 0
+    num_components = 0
+
+    for variance in pca.explained_variance_:
+        retained_variance += variance
+        num_components += 1
+        if retained_variance >= target_variance:
+            break
+    
+    # Reduz a dimensão para o número de componentes principais encontrados
+    pca = PCA(n_components=num_components)
+    X_pca = pca.fit_transform(X)
+    
+    return X_pca
+
+
 
 def normalize_fpfh(pcd_matrices):
     

@@ -12,7 +12,7 @@ def display_inlier_outlier(cloud, ind):
     inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
     o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
 
-    return inlier_cloud
+    # return inlier_cloud, outlier_cloud
 
 
 def guided_filter(pcd, radius, epsilon):

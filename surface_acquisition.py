@@ -152,27 +152,3 @@ def box(pcd):
 
 
 
-
-
-
-
-
-
-
-
-
-# pcd = mesh.sample_points_uniformly(number_of_points=900)
-# hull, _ = pcd.compute_convex_hull()
-# hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
-# hull_ls.paint_uniform_color((1, 0, 0))
-# mesh.compute_vertex_normals()
-# mesh.paint_uniform_color((1, 0.706, 0))
-
-
-# o3d.visualization.draw_geometries([mesh, hulls])
-
-# alpha = 0.001
-# print(f"alpha={alpha:.3f}")
-# mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, alpha)
-# # mesh.compute_vertex_normals()
-# o3d.visualization.draw_geometries([mesh], mesh_show_back_face=True)

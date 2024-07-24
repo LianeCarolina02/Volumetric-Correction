@@ -47,4 +47,4 @@ def prepare_dataset(source, target, voxel_size=0.01):
     # print(":: Prepare Target Dataset")
     target_down, target_fpfh = preprocessing(target, voxel_size)
 
-    return source, target, source_down, target_down, source_fpfh, target_fpfh
+    return source_down, target_down, source_fpfh, target_fpfh

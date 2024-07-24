@@ -71,21 +71,22 @@ import copy
 
 
 def first_transformation(digital_twin, surface_scan, downsample=10):
-    _, _, source_down, target_down, source_fpfh, target_fpfh = prd.prepare_dataset(digital_twin, surface_scan, voxel_size = downsample)
+    digital_twin.paint_uniform_color([1, 0.706, 0])
+    surface_scan.paint_uniform_color([0, 0.651, 0.929])
 
-    source_down_copy = copy.deepcopy(source_down)
-    transformation_ransac = RANSAC.global_registration_ransac(source_down, target_down, source_fpfh, target_fpfh,voxel_size = downsample,distance=50).transformation
+    # vis = o3d.visualization.Visualizer()
+    # vis.create_window(width=1600, height=1200)
+    # vis.add_geometry(digital_twin)
+    # vis.add_geometry(surface_scan)
+    # vis.run()
+    # vis.destroy_window()
+    source_down, target_down, source_fpfh, target_fpfh = prd.prepare_dataset(digital_twin, surface_scan, voxel_size = downsample)
+    global_transformation = RANSAC.global_registration_ransac(source_down, target_down, source_fpfh, target_fpfh, downsample, distance=5)
+    refinement_transformation = icp.vanilla_icp(source_down, target_down, downsample*2, global_transformation.transformation)
+    transformation = refinement_transformation.transformation
+    correspondence = np.asarray(refinement_transformation.correspondence_set)
 
-    source_down.transform(transformation_ransac)
-
-    icp_result = icp.vanilla_icp(source_down, target_down, 20)
-    correspondence = np.asarray(icp_result.correspondence_set)
-
-    transformation_icp = icp_result.transformation
-
-    transformation = transformation_icp @ transformation_ransac
-
-    return source_down_copy, target_down, transformation, correspondence
+    return source_down, target_down, transformation, correspondence
 
 def read_point_clouds(id, scan_2=False):
     patient = "BR0" + f"{id}"
@@ -391,8 +392,8 @@ def plot_distances(ids, evaluation_correspondence=True):
 
         source_temp.translate([500, 0, 0])
         target_temp.translate([500,0,0])
-        vis.add_geometry(source_temp)
-        vis.add_geometry(target_temp)
+        # vis.add_geometry(source_temp)
+        # vis.add_geometry(target_temp)
         vis.add_geometry(point_cloud)
         vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame(size=70.0))
         vis.run()
@@ -431,4 +432,5 @@ if __name__ == "__main__":
 
     # plot_distances(ids, True)
     # pcd = plot_correspondences(ids)
+    plot_distances(ids)
     plot_histogram_distances(ids)
