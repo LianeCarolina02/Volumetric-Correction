@@ -5,6 +5,8 @@ from scipy.spatial.distance import cdist
 import studies
 import copy
 import time
+import os
+import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +20,9 @@ from scipy.spatial.transform import Rotation
 import visualization
 np.set_printoptions(threshold=sys.maxsize)
 
-
+def write_to_file(message):
+    with open('log.txt', 'a') as file:
+        file.write(message + '\n')
 
 def downsample_open_3d(pcd, DOWNSAMPLED):
     pcd_twin_copy = copy.deepcopy(pcd)
@@ -44,6 +48,8 @@ def compute_euclidean_distances(VG):
     return distances_euclidean
 
 def graph_acquisition(pcd, VOXEL_SIZE:int, RADIUS:int):
+
+    initial_time = time.time()
     pcd_downsampled = pcd.voxel_down_sample(voxel_size=VOXEL_SIZE)
     pcd_downsampled.paint_uniform_color([1, 0.706, 0])
 
@@ -73,7 +79,7 @@ def graph_acquisition(pcd, VOXEL_SIZE:int, RADIUS:int):
     EG = set()
     for i in range(len(VG)):
         for j in range(i+1, len(VG)):
-            if distances_euclidean[i][j] <= RADIUS + 15:
+            if distances_euclidean[i][j] <= RADIUS * 2:
                 EG.add((i, j))
                 EG.add((j, i))
 
@@ -85,7 +91,8 @@ def graph_acquisition(pcd, VOXEL_SIZE:int, RADIUS:int):
     average_edges_per_node = np.mean(edge_count)
 
     print(f"Average number of edges per node: {average_edges_per_node}")
-    return VG, EG
+    final_time = time.time() - initial_time
+    return VG, EG, final_time
 
 def compute_weights(source_points, graph_points, sigma=1.0):
     weights = np.zeros((len(source_points), len(graph_points)))
@@ -115,7 +122,7 @@ def find_neighbors(pcd_source, pcd_graph, R):
     average_neighbors_per_point = np.mean(num_neighbors)
 
     print(f"Average number of neighbors per point: {average_neighbors_per_point}")
-    return neighbors_dict
+    return neighbors_dict, average_neighbors_per_point
 
 def compute_matrix_F(source_points, graph_points, neighbors_dict, a, b):
     n = len(source_points)
@@ -347,126 +354,237 @@ def SGD_with_capture(source_points, graph_points, target_points, tumor_points, n
 
 
 
-def SGD_without_capture(source_points, graph_points, target_points, tumor_points, neighbors_source, neighbors_tumor, EG, I_max, alpha:int, bs:list, ass:list, lb, epsilon):
-    time_1 = time.time()
+def SGD_without_capture(source_points, graph_points, target_points, tumor_points, 
+                        neighbors_source, neighbors_tumor, EG, 
+                        I_max, alpha:int, bs:list, ass:list, lb, epsilon,
+                        graph_time, more_time, downsample, radius, resolution, n_vertices, n_edges, n_source, 
+                        n_neighbors_source, n_neighbors_tumor, name_cols):
+    
+    initial_time_matrices_tumor = time.time()
     all_tumor_points = []
-    n = len(source_points)
-
     all_F_tumor = []
     all_P_tumor = []
-    for idx in range(len(bs)):
-        F_tumor = compute_matrix_F(source_points=tumor_points, graph_points=graph_points, neighbors_dict=neighbors_tumor, a=ass[idx], b=bs[idx])
-        P_tumor = compute_matrix_P(source_points=tumor_points, graph_points=graph_points, neighbors_dict=neighbors_tumor, a=ass[idx], b=bs[idx])
+    computation_matrixes_time_tumor = []
+
+    for i in bs:
+        F_tumor = compute_matrix_F(source_points=tumor_points, graph_points=graph_points, neighbors_dict=neighbors_tumor, a=1/2, b=i)
+        P_tumor = compute_matrix_P(source_points=tumor_points, graph_points=graph_points, neighbors_dict=neighbors_tumor, a=1/2, b=i)
         all_F_tumor.append(F_tumor)
         all_P_tumor.append(P_tumor)
-        print("Done F_tumor")
+        computation_matrixes_time_tumor.append(time.time() - initial_time_matrices_tumor)
+        print(f'Coeficient_b_{i}')
+    
+    print(f'all_F_tumor_after_b: {len(all_F_tumor)}')
+    
+    for i in ass:
+        F_tumor = compute_matrix_F(source_points=tumor_points, graph_points=graph_points, neighbors_dict=neighbors_tumor, a=i, b=1)
+        P_tumor = compute_matrix_P(source_points=tumor_points, graph_points=graph_points, neighbors_dict=neighbors_tumor, a=i, b=1)
+        all_F_tumor.append(F_tumor)
+        all_P_tumor.append(P_tumor)
+        computation_matrixes_time_tumor.append(time.time() - initial_time_matrices_tumor)
+        print(f'Coeficient_a_{i}')
+
+    initial_time_matrices_source = time.time()
+    print(f'all_F_tumor_after_b_a: {len(all_F_tumor)}')
 
     F = compute_matrix_F(source_points=source_points, graph_points=graph_points, neighbors_dict=neighbors_source, a=1/2, b=1)
     P = compute_matrix_P(source_points=source_points, graph_points=graph_points, neighbors_dict=neighbors_source, a=1/2, b=1)
+    computation_matrixes_time_source = time.time() - initial_time_matrices_source
 
     B = compute_matrix_B(EG, graph_points=graph_points)
     Y = compute_matrix_Y(graph_points=graph_points, EG=EG)
-    # J = compute_matrix_J(graph_points=graph_points)
 
     target_tree = cKDTree(target_points)
     error = np.inf
     errors = []
     X = compute_matrix_X(graph_points=graph_points, int_value=-0.0000001)
-    time_2 = time.time()
-    print(f"Initialization Time: {time_2 - time_1}")
 
     for iteration in range(I_max):
         U = compute_matrix_U(source_points=source_points, target_tree=target_tree, target_points=target_points)[0]
-        # Z = compute_matrix_Z(X)
-        
         E_a, E_re = gradient(X_matrix=X, F_matrix=F, P_matrix=P, U_matrix=U, B_matrix=B, Y_matrix=Y)
 
-        G = 2 * (E_a + alpha * E_re) # + betas[parameter] * E_ro)
+        G = 2 * (E_a + alpha * E_re)
         X_new = X - lb * G
 
-        new_error = compute_error(E_a, E_re, alpha) / n
+        new_error = compute_error(E_a, E_re, alpha) / n_source
 
         source_points = F @ X_new + P
 
         if np.abs(error - new_error) < epsilon:
             break
+
+        if new_error > error + 10000:
+            raise ValueError(f'FAILED')
+
         error = new_error
-        f_E_a = frobenius_norm_squared(E_a) / n
-        f_E_re = alpha * frobenius_norm_squared(E_re) / n
-        # f_E_ro = betas[parameter] * frobenius_norm_squared(E_ro) / n
-        errors.append([error, f_E_a, f_E_re])#, f_E_ro])
+        f_E_a = frobenius_norm_squared(E_a) / n_source
+        f_E_re = alpha * frobenius_norm_squared(E_re) / n_source
+        errors.append([error, f_E_a, f_E_re])
         X = X_new
-        print(f"Iteration {iteration}, Total Error: {new_error}, Align Error: {f_E_a}, Reg Error: {f_E_re}")#, Rot Error: {f_E_ro}")
+        print(f"Iteration {iteration}, Total Error: {new_error}")
+
+        algorithm_time = time.time() - initial_time_matrices_source
 
     for idx in range(len(bs)):
+        print(f'Tumor_points_index_of_F{idx}')
+        print(f'Value of b_{bs[idx]} and a_1/2')
         tumor_points = all_F_tumor[idx] @ X + all_P_tumor[idx]
-        all_tumor_points.append(tumor_points)
+        print("done tumor_points")
+    
+        total_time = (time.time() - initial_time_matrices_tumor) + graph_time + more_time
+        
+        values_cols = [graph_time, downsample, radius, n_vertices, n_edges, resolution, computation_matrixes_time_source, computation_matrixes_time_tumor[idx], 
+                       algorithm_time, total_time, iteration, bs[idx], 1/2, lb, n_source, n_neighbors_source, n_neighbors_tumor]
+        
+        save_row_to_csv('Studies.csv', name_cols, values_cols)
+        print("done saving csv")
 
-    print(f"SVD Time: {time.time() - time_2}")
+        save_pickle(source_points, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}/RESOLUTION{resolution}/Step_Size{lb}', 'source_pcd')
+        print("done saving pickles")
+        save_pickle(graph_points, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}' , 'graph_pcd')
+        print("done saving pickles")
+        save_pickle(errors, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}/RESOLUTION{resolution}/Step_Size{lb}' , 'erros')
+        print("done saving pickles")
+        save_pickle(tumor_points, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}/RESOLUTION{resolution}/Step_Size{lb}' ,f'tumor_pcd_B{bs[idx]}_A0_5')
+        print("done saving pickles")
+
+    
+    for idx in range(len(ass)):
+        print(f'Tumor_points_index_of_F{idx + len(bs)}')
+        print(f'Value of b_1 and a_{ass[idx]}')
+        tumor_points = all_F_tumor[idx + len(bs)] @ X + all_P_tumor[idx + len(bs)]
+    
+        total_time = (time.time() - initial_time_matrices_tumor) + graph_time + more_time
+
+        
+        values_cols = [graph_time, downsample, radius, n_vertices, n_edges, resolution, computation_matrixes_time_source, computation_matrixes_time_tumor[idx + len(bs)], 
+                       algorithm_time, total_time, iteration, 1, ass[idx], lb, n_source, n_neighbors_source, n_neighbors_tumor]
+        
+        save_row_to_csv('Studies.csv', name_cols, values_cols)
+
+        save_pickle(source_points, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}/RESOLUTION{resolution}/Step_Size{lb}', 'source_pcd')
+        save_pickle(graph_points, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}', 'graph_pcd')
+        save_pickle(errors, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}/RESOLUTION{resolution}/Step_Size{lb}' , 'erros')
+        save_pickle(tumor_points, f'Pickles/id_{ID}/RADIUS_{radius}/DOWNSAMPLE_{downsample}/RESOLUTION{resolution}/Step_Size{lb}' , f'tumor_pcd_B1_A{ass[idx]}')
+    
+    write_to_file(f'FINISHED- ID:{ID} RADIUS:{RADIUS} DOWNSAMPLE:{DOWNSAMPLE} RESOLUTION:{VOXEL_SIZE} Step_Size:{lb}')
+
+
     return source_points, all_tumor_points, errors, iteration
 
 
-def save_point_cloud_in_pickle(points, name:str):
-    point_cloud = o3d.geometry.PointCloud()
-    point_cloud.points = o3d.utility.Vector3dVector(points)
-    point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=15, max_nn=30))
+def save_pickle(pickle_object, folder: str, file_name: str):
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
-    with open(f'{name}.pkl', 'wb') as f:
-        pickle.dump(point_cloud, f)
+    full_path = os.path.join(folder, f'{file_name}.pkl')
+    print(full_path)
+
+    with open(full_path, 'wb') as f:
+        pickle.dump(pickle_object, f)
+
+def save_row_to_csv(file_path, col_names, values):
+    """
+    Save a list of values to a CSV file at the specified row and column names.
+    
+    Parameters:
+    - file_path: str, path to the CSV file.
+    - row_name: str, the name of the row.
+    - col_names: list of str, the names of the columns.
+    - values: list, the values to save in the columns.
+    """
+    if len(col_names) != len(values):
+        raise ValueError("The length of column names and values must be the same.")
+
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+    else:
+        df = pd.DataFrame(columns=col_names)
+    
+    for col_name in col_names:
+        if col_name not in df.columns:
+            df[col_name] = pd.Series(dtype='object')
+    
+    # Create a new row with the specified values
+    new_row = dict(zip(col_names, values))
+    
+    # Append the new row to the DataFrame
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    
+    # Save the DataFrame back to the CSV file
+    df.to_csv(file_path, index=False)
 
 
 if __name__ == "__main__":
 
     # out = visualization.video_set_up("original", fps=30, width=1920, height=1080)
+    IDS = [61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 73, 74, 76]
+    name_cols = ['graph_time', 'Downsample', 'Radius', 'NGraphPoints', 'NGraphEdges', 'Resolution',
+                 'initial_matrixes_time_source', 'initial_matrixes_time_tumor', 'algorithm_time', 'TotalTime', 'iterations', 
+                 'B_Weights', 'A_Weights', 'Step_Size', 'NSourcePoints', 'NNeighborsSource', 'NNeighborsTumor'
+                 ]
 
-    DOWNSAMPLE = 2
-    TUMOR_PATH = "Pacients/BR074/Segment_1.stl"
-    ID = 74
-    RADIUS = 15
-    VOXEL_SIZE = 10
+    for ID in IDS:
 
-    pcd_scan, pcd_twin, pcd_tumor = studies.read_point_clouds(ID, scan_2=False)
-    _, _, transformation,_ = studies.first_transformation(pcd_twin, pcd_scan)
-    pcd_twin.paint_uniform_color([1, 0.706, 0])
-    pcd_scan.paint_uniform_color([0, 0.651, 0.929])
-    pcd_twin.transform(transformation)
-    pcd_tumor.transform(transformation)
+        ALL_RADIUS = [15, 20, 30]
+        ALL_DOWNSAMPLE = [10, 15]
+        VOXEL_SIZES = [0.1, 0.5, 1, 2]
+        TUMOR_PATH = f"Pacients/BR0{ID}/Segment_1.stl"
 
-    VG_TWIN, EG_TWIN = graph_acquisition(pcd_twin, VOXEL_SIZE, RADIUS)
-    print("# Graph Points:", len(VG_TWIN))
-    print("# Edges:", len(EG_TWIN))
-    pcd_vg = visualization.visualize_graph(VG=VG_TWIN, EG=EG_TWIN, pcd_tumor=pcd_tumor, show_tumor=True)
+        for RADIUS in ALL_RADIUS:
+            for DOWNSAMPLE in ALL_DOWNSAMPLE:
 
-    graph_points = np.array(VG_TWIN)
-    source_points = np.asarray(pcd_twin.points)
-    target_points = np.array(pcd_scan.points)
-    tumor_points = np.array(pcd_tumor.points)
+                _time_ = np.round(time.time(), 4)
 
-    print(f"# Source points: {len(source_points)}")
-    print(f"# Target points: {len(target_points)}")
-    print(f"# Tumor points: {len(tumor_points)}")
+                pcd_scan, pcd_twin, pcd_tumor = studies.read_point_clouds(ID, scan_2=False)
+                _, _, transformation,_ = studies.first_transformation(pcd_twin, pcd_scan)
+                pcd_twin.transform(transformation)
+                pcd_tumor.transform(transformation)
 
-    pcd_twin = pcd_twin.voxel_down_sample(voxel_size=2)
-    source_points = np.asarray(pcd_twin.points)
-    print(f"# Source points: {len(source_points)}")
+                VG_TWIN, EG_TWIN, graph_time = graph_acquisition(pcd_twin, DOWNSAMPLE, RADIUS)
 
-    neighbors_dictionary = find_neighbors(pcd_twin, pcd_vg, 20)
-    neighbors_tumor = find_neighbors(pcd_tumor, pcd_vg, 150)
-    print("Neighbors acquired")
+                additional_time = time.time()
 
-    max_iterations = 5000
-    alpha = 0.1
-    coeficient_weights_b = [1]  
-    coeficient_weights_a = [1/2]
-    epsilon = 0.001
-    lb = 0.0001
+                pcd_vg = visualization.visualize_graph(VG=VG_TWIN, EG=EG_TWIN, pcd_tumor=pcd_tumor)
 
-    new_source_points, all_new_tumor_points, erros, it = SGD_without_capture(source_points=source_points, graph_points=graph_points, target_points=target_points, tumor_points=tumor_points, 
-                                                                       neighbors_source=neighbors_dictionary, neighbors_tumor= neighbors_tumor, 
-                                                                       EG=EG_TWIN, 
-                                                                       I_max=max_iterations, alpha=alpha, bs=coeficient_weights_b, ass=coeficient_weights_a, lb=lb, epsilon=epsilon)
+                for VOXEL_SIZE in VOXEL_SIZES:
+                    pcd_twin = pcd_twin.voxel_down_sample(voxel_size=VOXEL_SIZE)
 
-    save_point_cloud_in_pickle(new_source_points, f"Pickles/source_points_it{it}_alpha{alpha}_lb{lb}_epsilon{epsilon}")
+                    source_points = np.asarray(pcd_twin.points)
+                    graph_points = np.array(VG_TWIN)
+                    target_points = np.array(pcd_scan.points)
+                    tumor_points = np.array(pcd_tumor.points)
 
-    for i, (a, b) in enumerate(zip(coeficient_weights_a, coeficient_weights_b)):
-        save_point_cloud_in_pickle(all_new_tumor_points[i], f"Pickles/tumor_points_a{a}_b{b}")
+                    n_source = len(source_points)
+                    n_vertices = len(VG_TWIN)
+                    n_edges = len(EG_TWIN)
+
+                    neighbors_dictionary, n_neighbors_source = find_neighbors(pcd_twin, pcd_vg, 20)
+                    neighbors_tumor, n_neighbors_tumor = find_neighbors(pcd_tumor, pcd_vg, 150)
+
+                    max_iterations = 2000
+                    coeficient_weights_b = [1/100, 1/20, 1/2, 1, 2, 8, 20]
+                    coeficient_weights_a = [1/40, 1/20, 1/2, 1, 2, 8, 20]
+                    alpha = 0.1
+                    epsilon = 0.1
+                    LAMBDAS = [10**-7, 10**-6, 10**-5, 10**-4]
+
+                    for lb in LAMBDAS:
+                        write_to_file(f'STARTED- ID:{ID} RADIUS:{RADIUS} DOWNSAMPLE:{DOWNSAMPLE} RESOLUTION:{VOXEL_SIZE} Step_Size:{lb}')
+                        print(f"ID:{ID} RADIUS:{RADIUS} DOWNSAMPLE:{DOWNSAMPLE} RESOLUTION:{VOXEL_SIZE} Step_Size:{lb}")
+
+                        additional_time_1 = time.time() - additional_time
+                        try:
+                            NEW_SOURCE_POINTS, ALL_TUMOR_POINTS, ERROS, IT = SGD_without_capture(source_points, graph_points, target_points, tumor_points,
+                                                                                            neighbors_dictionary, neighbors_tumor, EG_TWIN,
+                                                                                            max_iterations, alpha, coeficient_weights_b, coeficient_weights_a,
+                                                                                            lb, epsilon,
+                                                                                            graph_time, additional_time_1, DOWNSAMPLE, RADIUS, VOXEL_SIZE, n_vertices, n_edges, n_source, 
+                                                                                            n_neighbors_source, n_neighbors_tumor, name_cols)
+                        
+                        except Exception as e:
+                            print(ValueError)
+                            write_to_file(f'FAILED- ID:{ID} RADIUS:{RADIUS} DOWNSAMPLE:{DOWNSAMPLE} RESOLUTION:{VOXEL_SIZE} Step_Size:{lb}')
+
+
+                    
